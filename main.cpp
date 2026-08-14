@@ -10,7 +10,9 @@ constexpr int bossHeight = 180;
 constexpr float normalPlayerSpeed = 300.0f;
 constexpr float dashPlayerSpeed = 450.0f;
 constexpr int maxBullets = 3;
-constexpr float bulletSpeed = 1000.f;
+constexpr float playerBulletSpeed = 1000.f;
+constexpr float bossBulletSpeed = 400.0f;
+constexpr float bossShootInterval = 1.0f;
 
 struct Bullet
 {
@@ -73,6 +75,15 @@ void UpdatePlayer(Vector2& playerPos, float deltaTime)
     playerPos.y = ClampValue(playerPos.y, 0.0f, (float)(screenHeight - playerSize));
 }
 
+void InitializeBullets(Bullet (&bullets)[maxBullets])
+{
+    for(Bullet& bullet : bullets)
+    {
+        bullet.bulletActive = false;
+        bullet.bulletPos = {0.0f, 0.0f};
+    }
+}
+
 void ShootBullets(Bullet (&bullets)[maxBullets], const Vector2& playerPos)
 {
     //ShootBullets
@@ -99,7 +110,7 @@ void UpdateBullets(Bullet (&bullets)[maxBullets], float deltaTime, int& bossHP, 
     {
         if(bullet.bulletActive)
         {
-            bullet.bulletPos.x += bulletSpeed * deltaTime;
+            bullet.bulletPos.x += playerBulletSpeed * deltaTime;
             if(bossHP > 0 && CheckCollisionCircleRec(bullet.bulletPos, bulletSize, bossRec))
             {
                 bossHP--;
@@ -117,10 +128,58 @@ void UpdateBullets(Bullet (&bullets)[maxBullets], float deltaTime, int& bossHP, 
     }
 }
 
+void DrawBullets(const Bullet (&bullets)[maxBullets], Color color)
+{
+    for(const Bullet& bullet : bullets)
+    {
+        if(bullet.bulletActive)
+        {
+            DrawCircle((int)bullet.bulletPos.x, (int)bullet.bulletPos.y, bulletSize, color);
+        }
+    }
+}
+
+void ShootBossBullets(Bullet (&bullets)[maxBullets], const Vector2& bossPos, float deltaTime, float& shootTimer)
+{
+    //ShootBullets
+    shootTimer += deltaTime;
+
+    if(shootTimer < bossShootInterval) return;
+
+    shootTimer = 0.0f;
+    for(Bullet& bullet : bullets)
+    {
+        if(bullet.bulletActive) continue;
+
+        bullet.bulletActive = true;
+
+        bullet.bulletPos = bossPos;
+        bullet.bulletPos.y += (bossHeight / 2.0f);
+        break;
+    }
+}
+
+void UpdateBossBullets(Bullet (&bullets)[maxBullets], float deltaTime)
+{
+    for(Bullet& bullet : bullets)
+    {
+        if(bullet.bulletActive)
+        {
+            bullet.bulletPos.x -= bossBulletSpeed * deltaTime;
+            if(bullet.bulletPos.x < 0.0f)
+            {
+                bullet.bulletActive = false;
+                bullet.bulletPos = {0.0f, 0.0f};
+            }
+        }
+    }
+}
+
 int main()
 {
     InitWindow(screenWidth, screenHeight, "Boss Battle");
     SetTargetFPS(60);
+    float bossShootTimer = 0.0f;
 
     Vector2 playerPos = {200.f, 500.f};
     
@@ -128,33 +187,29 @@ int main()
     int bossHP = 10;
     Rectangle bossRec = {bossPos.x, bossPos.y, bossWidth, bossHeight};
 
-    Bullet bullets[maxBullets];
-    for(Bullet& bullet : bullets)
-    {
-        bullet.bulletPos = {0.0f, 0.0f};
-        bullet.bulletActive = false;
-    }
+    Bullet playerBullets[maxBullets];
+    Bullet bossBullets[maxBullets];
+    InitializeBullets(playerBullets);
+    InitializeBullets(bossBullets);
 
     while (!WindowShouldClose())
     {
         float deltaTime = GetFrameTime();
-
+        
         UpdatePlayer(playerPos, deltaTime);        
-        ShootBullets(bullets, playerPos);
-        UpdateBullets(bullets, deltaTime, bossHP, bossRec);
+        ShootBullets(playerBullets, playerPos);
+        UpdateBullets(playerBullets, deltaTime, bossHP, bossRec);
+
+        if(bossHP > 0) ShootBossBullets(bossBullets, bossPos, deltaTime, bossShootTimer);
+        UpdateBossBullets(bossBullets, deltaTime);
 
         //Drawing
         BeginDrawing();
 
         ClearBackground(RAYWHITE);
         DrawRectangle((int)playerPos.x, (int)playerPos.y, playerSize, playerSize, SKYBLUE);
-        for(const Bullet& bullet : bullets)
-        {
-            if(bullet.bulletActive)
-            {
-                DrawCircle((int)bullet.bulletPos.x, (int)bullet.bulletPos.y, bulletSize, BLACK);
-            }
-        }
+        DrawBullets(playerBullets, BLACK);
+        DrawBullets(bossBullets, RED);
         DrawText("Boss Battle", 20, 20, 24, BLACK);
         if(bossHP > 0)
         {
