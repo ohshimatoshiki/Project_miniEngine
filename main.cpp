@@ -84,7 +84,7 @@ void InitializeBullets(Bullet (&bullets)[maxBullets])
     }
 }
 
-void ShootBullets(Bullet (&bullets)[maxBullets], const Vector2& playerPos)
+void ShootPlayerBullets(Bullet (&bullets)[maxBullets], const Vector2& playerPos)
 {
     //ShootBullets
     if(IsKeyPressed(KEY_SPACE))
@@ -103,7 +103,7 @@ void ShootBullets(Bullet (&bullets)[maxBullets], const Vector2& playerPos)
     }
 }
 
-void UpdateBullets(Bullet (&bullets)[maxBullets], float deltaTime, int& bossHP, const Rectangle& bossRec)
+void UpdatePlayerBullets(Bullet (&bullets)[maxBullets], float deltaTime, int& bossHP, const Rectangle& bossRec)
 {
     //Move and remove bullets
     for(Bullet& bullet : bullets)
@@ -159,13 +159,21 @@ void ShootBossBullets(Bullet (&bullets)[maxBullets], const Vector2& bossPos, flo
     }
 }
 
-void UpdateBossBullets(Bullet (&bullets)[maxBullets], float deltaTime)
+void UpdateBossBullets(Bullet (&bullets)[maxBullets], float deltaTime, int& playerHP, const Rectangle& playerRec)
 {
     for(Bullet& bullet : bullets)
     {
         if(bullet.bulletActive)
         {
             bullet.bulletPos.x -= bossBulletSpeed * deltaTime;
+            if(playerHP > 0 && CheckCollisionCircleRec(bullet.bulletPos, bulletSize, playerRec))
+            {
+                playerHP--;
+                    
+                bullet.bulletActive = false;
+                bullet.bulletPos = {0.0f, 0.0f};
+            }
+
             if(bullet.bulletPos.x < 0.0f)
             {
                 bullet.bulletActive = false;
@@ -182,6 +190,8 @@ int main()
     float bossShootTimer = 0.0f;
 
     Vector2 playerPos = {200.f, 500.f};
+    int playerHP = 3;
+    Rectangle playerRec = {playerPos.x, playerPos.y, playerSize, playerSize};
     
     Vector2 bossPos = {1000.0f, 240.0f};
     int bossHP = 10;
@@ -196,21 +206,40 @@ int main()
     {
         float deltaTime = GetFrameTime();
         
-        UpdatePlayer(playerPos, deltaTime);        
-        ShootBullets(playerBullets, playerPos);
-        UpdateBullets(playerBullets, deltaTime, bossHP, bossRec);
-
-        if(bossHP > 0) ShootBossBullets(bossBullets, bossPos, deltaTime, bossShootTimer);
-        UpdateBossBullets(bossBullets, deltaTime);
+        if(playerHP > 0) 
+        {
+            UpdatePlayer(playerPos, deltaTime);   
+            playerRec.x = playerPos.x;
+            playerRec.y = playerPos.y;     
+            ShootPlayerBullets(playerBullets, playerPos);
+        }
+        UpdatePlayerBullets(playerBullets, deltaTime, bossHP, bossRec);
+        
+        if(playerHP > 0 && bossHP > 0) 
+        {
+            ShootBossBullets(bossBullets, bossPos, deltaTime, bossShootTimer);
+        }
+        UpdateBossBullets(bossBullets, deltaTime, playerHP, playerRec);
 
         //Drawing
         BeginDrawing();
 
         ClearBackground(RAYWHITE);
-        DrawRectangle((int)playerPos.x, (int)playerPos.y, playerSize, playerSize, SKYBLUE);
+        
+        if(playerHP > 0) 
         DrawBullets(playerBullets, BLACK);
         DrawBullets(bossBullets, RED);
         DrawText("Boss Battle", 20, 20, 24, BLACK);
+        if(playerHP > 0)
+        {
+            DrawText(TextFormat("Player HP: %d", playerHP), 20, 80, 20, BLACK);
+            DrawRectangle((int)playerPos.x, (int)playerPos.y, playerSize, playerSize, SKYBLUE);
+        }
+        else
+        {
+            DrawText("You Lose...", 20, 80, 20, BLACK);
+        }
+
         if(bossHP > 0)
         {
             DrawText(TextFormat("Boss HP: %d", bossHP), 1000, 200, 20, BLACK);
