@@ -226,7 +226,6 @@ int main()
 
         ClearBackground(RAYWHITE);
         
-        if(playerHP > 0) 
         DrawBullets(playerBullets, BLACK);
         DrawBullets(bossBullets, RED);
         DrawText("Boss Battle", 20, 20, 24, BLACK);
