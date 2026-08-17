@@ -4,7 +4,9 @@
 constexpr int screenWidth = 1280;
 constexpr int screenHeight = 720;
 constexpr int playerSize = 50;
-constexpr int bulletSize = 5;
+constexpr int playerBulletSize = 5;
+constexpr int normalBulletSize = 5;
+constexpr int hardBulletSize = 10;
 constexpr int bossWidth = 100;
 constexpr int bossHeight = 180;
 constexpr float normalPlayerSpeed = 300.0f;
@@ -27,6 +29,8 @@ constexpr int initialBossHP = 10;
 struct Bullet
 {
     Vector2 bulletPos;
+    Vector2 bulletDirection;
+    int bulletSize;
     bool bulletActive;
 };
 
@@ -38,25 +42,32 @@ enum class GameState
     GameOver
 };
 
+enum class GameMode
+{
+    Normal,
+    Hard
+};
+
 // Function prototype
-void ResetGame(Vector2 &playerPos, int &playerHP, Rectangle &playerRec, int &bossHP, Bullet (&playerBullets)[maxBullets], Bullet (&bossBullets)[maxBullets], float &bossShootTimer);
+void ResetGame(Vector2 &playerPos, int &playerHP, Rectangle &playerRec, int &bossHP, Bullet (&playerBullets)[maxBullets], Bullet (&bossBullets)[maxBullets], float &bossShootTimer, GameMode gameMode);
 float ClampValue(float value, float min, float max);
 void UpdatePlayer(Vector2 &playerPos, float deltaTime);
-void InitializeBullets(Bullet (&bullets)[maxBullets]);
+void InitializePlayerBullets(Bullet (&bullets)[maxBullets]);
+void InitializeBossBullets(Bullet (&bullets)[maxBullets], GameMode gameMode);
 void ShootPlayerBullets(Bullet (&bullets)[maxBullets], const Vector2 &playerPos);
 void UpdatePlayerBullets(Bullet (&bullets)[maxBullets], float deltaTime, int &bossHP, const Rectangle &bossRec, bool collisionEnabled);
 void DrawBullets(const Bullet (&bullets)[maxBullets], Color color);
-void ShootBossBullets(Bullet (&bullets)[maxBullets], const Vector2 &bossPos, float deltaTime, float &shootTimer);
+void ShootBossBullets(Bullet (&bullets)[maxBullets], const Vector2 &playerPos, const Vector2 &bossPos, float deltaTime, float &shootTimer, GameMode gameMode);
 void UpdateBossBullets(Bullet (&bullets)[maxBullets], float deltaTime, int &playerHP, const Rectangle &playerRec, bool collisionEnabled);
 
-void ResetGame(Vector2 &playerPos, int &playerHP, Rectangle &playerRec, int &bossHP, Bullet (&playerBullets)[maxBullets], Bullet (&bossBullets)[maxBullets], float &bossShootTimer)
+void ResetGame(Vector2 &playerPos, int &playerHP, Rectangle &playerRec, int &bossHP, Bullet (&playerBullets)[maxBullets], Bullet (&bossBullets)[maxBullets], float &bossShootTimer, GameMode gameMode)
 {
     playerPos = initialPlayerPos;
     playerHP = initialPlayerHP;
     playerRec = {playerPos.x, playerPos.y, playerSize, playerSize};
     bossHP = initialBossHP;
-    InitializeBullets(playerBullets);
-    InitializeBullets(bossBullets);
+    InitializePlayerBullets(playerBullets);
+    InitializeBossBullets(bossBullets, gameMode);
     bossShootTimer = 0.0f;
 }
 
@@ -118,12 +129,33 @@ void UpdatePlayer(Vector2 &playerPos, float deltaTime)
     playerPos.y = ClampValue(playerPos.y, 0.0f, (float)(screenHeight - playerSize));
 }
 
-void InitializeBullets(Bullet (&bullets)[maxBullets])
+void InitializePlayerBullets(Bullet (&bullets)[maxBullets])
 {
     for (Bullet &bullet : bullets)
     {
         bullet.bulletActive = false;
         bullet.bulletPos = {0.0f, 0.0f};
+        bullet.bulletDirection = {0.0f, 0.0f};
+        bullet.bulletSize = playerBulletSize;
+    }
+}
+
+void InitializeBossBullets(Bullet (&bullets)[maxBullets], GameMode gameMode)
+{
+    for (Bullet &bullet : bullets)
+    {
+        bullet.bulletActive = false;
+        bullet.bulletPos = {0.0f, 0.0f};
+        bullet.bulletDirection = {0.0f, 0.0f};
+        switch (gameMode)
+        {
+        case GameMode::Normal:
+            bullet.bulletSize = normalBulletSize;
+            break;
+        case GameMode::Hard:
+            bullet.bulletSize = hardBulletSize;
+            break;
+        }
     }
 }
 
@@ -155,7 +187,7 @@ void UpdatePlayerBullets(Bullet (&bullets)[maxBullets], float deltaTime, int &bo
         if (bullet.bulletActive)
         {
             bullet.bulletPos.x += playerBulletSpeed * deltaTime;
-            if (collisionEnabled && bossHP > 0 && CheckCollisionCircleRec(bullet.bulletPos, bulletSize, bossRec))
+            if (collisionEnabled && bossHP > 0 && CheckCollisionCircleRec(bullet.bulletPos, bullet.bulletSize, bossRec))
             {
                 bossHP--;
 
@@ -178,13 +210,34 @@ void DrawBullets(const Bullet (&bullets)[maxBullets], Color color)
     {
         if (bullet.bulletActive)
         {
-            DrawCircle((int)bullet.bulletPos.x, (int)bullet.bulletPos.y, bulletSize, color);
+            DrawCircle((int)bullet.bulletPos.x, (int)bullet.bulletPos.y, bullet.bulletSize, color);
         }
     }
 }
 
-void ShootBossBullets(Bullet (&bullets)[maxBullets], const Vector2 &bossPos, float deltaTime, float &shootTimer)
+void ShootBossBullets(Bullet (&bullets)[maxBullets], const Vector2 &playerPos, const Vector2 &bossPos, float deltaTime, float &shootTimer, GameMode gameMode)
 {
+    Vector2 direction;
+
+    if (gameMode == GameMode::Normal)
+    {
+        direction = {-1.0f, 0.0f};
+    }
+    else
+    {
+        Vector2 bulletStartPos = {bossPos.x, bossPos.y + (bossHeight / 2.0f)};
+        Vector2 playerCenter = {playerPos.x + (playerSize / 2.0f), playerPos.y + (playerSize / 2.0f)};
+        direction = {playerCenter.x - bulletStartPos.x, playerCenter.y - bulletStartPos.y};
+
+        // normalization
+        float length = sqrt(direction.x * direction.x + direction.y * direction.y);
+        if (length > 0.0f)
+        {
+            direction.x = direction.x / length;
+            direction.y = direction.y / length;
+        }
+    }
+
     // ShootBullets
     shootTimer += deltaTime;
 
@@ -198,9 +251,10 @@ void ShootBossBullets(Bullet (&bullets)[maxBullets], const Vector2 &bossPos, flo
             continue;
 
         bullet.bulletActive = true;
-
+        bullet.bulletDirection = direction;
         bullet.bulletPos = bossPos;
         bullet.bulletPos.y += (bossHeight / 2.0f);
+
         break;
     }
 }
@@ -211,8 +265,9 @@ void UpdateBossBullets(Bullet (&bullets)[maxBullets], float deltaTime, int &play
     {
         if (bullet.bulletActive)
         {
-            bullet.bulletPos.x -= bossBulletSpeed * deltaTime;
-            if (collisionEnabled && playerHP > 0 && CheckCollisionCircleRec(bullet.bulletPos, bulletSize, playerRec))
+            bullet.bulletPos.x += bullet.bulletDirection.x * bossBulletSpeed * deltaTime;
+            bullet.bulletPos.y += bullet.bulletDirection.y * bossBulletSpeed * deltaTime;
+            if (collisionEnabled && playerHP > 0 && CheckCollisionCircleRec(bullet.bulletPos, bullet.bulletSize, playerRec))
             {
                 playerHP--;
 
@@ -234,6 +289,7 @@ int main()
     InitWindow(screenWidth, screenHeight, "Boss Battle");
     SetTargetFPS(60);
     GameState gameState = GameState::ModeSelect;
+    GameMode gameMode = GameMode::Normal;
 
     Rectangle normalButtonRec = {normalButtonPos.x, normalButtonPos.y, buttonWidth, buttonHeight};
     Rectangle hardButtonRec = {hardButtonPos.x, hardButtonPos.y, buttonWidth, buttonHeight};
@@ -245,8 +301,8 @@ int main()
     Rectangle bossRec = {bossPos.x, bossPos.y, bossWidth, bossHeight};
     Bullet playerBullets[maxBullets];
     Bullet bossBullets[maxBullets];
-    InitializeBullets(playerBullets);
-    InitializeBullets(bossBullets);
+    InitializePlayerBullets(playerBullets);
+    InitializeBossBullets(bossBullets, gameMode);
     float bossShootTimer = 0.0f;
 
     while (!WindowShouldClose())
@@ -263,12 +319,14 @@ int main()
             if (CheckCollisionRecs(playerRec, normalButtonRec) && IsKeyPressed(KEY_ENTER))
             {
                 gameState = GameState::Playing;
-                ResetGame(playerPos, playerHP, playerRec, bossHP, playerBullets, bossBullets, bossShootTimer);
+                gameMode = GameMode::Normal;
+                ResetGame(playerPos, playerHP, playerRec, bossHP, playerBullets, bossBullets, bossShootTimer, gameMode);
             }
             else if (CheckCollisionRecs(playerRec, hardButtonRec) && IsKeyPressed(KEY_ENTER))
             {
                 gameState = GameState::Playing;
-                ResetGame(playerPos, playerHP, playerRec, bossHP, playerBullets, bossBullets, bossShootTimer);
+                gameMode = GameMode::Hard;
+                ResetGame(playerPos, playerHP, playerRec, bossHP, playerBullets, bossBullets, bossShootTimer, gameMode);
             }
             break;
         case GameState::Playing:
@@ -276,7 +334,7 @@ int main()
             playerRec.x = playerPos.x;
             playerRec.y = playerPos.y;
             ShootPlayerBullets(playerBullets, playerPos);
-            ShootBossBullets(bossBullets, bossPos, deltaTime, bossShootTimer);
+            ShootBossBullets(bossBullets, playerPos, bossPos, deltaTime, bossShootTimer, gameMode);
             UpdatePlayerBullets(playerBullets, deltaTime, bossHP, bossRec, true);
             UpdateBossBullets(bossBullets, deltaTime, playerHP, playerRec, true);
             // Check win/lose conditions
@@ -299,14 +357,14 @@ int main()
             if (IsKeyPressed(KEY_R))
             {
                 gameState = GameState::ModeSelect;
-                ResetGame(playerPos, playerHP, playerRec, bossHP, playerBullets, bossBullets, bossShootTimer);
+                ResetGame(playerPos, playerHP, playerRec, bossHP, playerBullets, bossBullets, bossShootTimer, gameMode);
             }
             break;
         case GameState::GameOver:
             if (IsKeyPressed(KEY_R))
             {
                 gameState = GameState::ModeSelect;
-                ResetGame(playerPos, playerHP, playerRec, bossHP, playerBullets, bossBullets, bossShootTimer);
+                ResetGame(playerPos, playerHP, playerRec, bossHP, playerBullets, bossBullets, bossShootTimer, gameMode);
             }
             UpdatePlayerBullets(playerBullets, deltaTime, bossHP, bossRec, false);
             UpdateBossBullets(bossBullets, deltaTime, playerHP, playerRec, false);
