@@ -14,7 +14,8 @@ constexpr float dashPlayerSpeed = 450.0f;
 constexpr int maxBullets = 3;
 constexpr float playerBulletSpeed = 1000.0f;
 constexpr float bossBulletSpeed = 400.0f;
-constexpr float bossShootInterval = 1.0f;
+constexpr float normalBossShootInterval = 1.0f;
+constexpr float hardBossShootInterval = 0.5f;
 constexpr int buttonWidth = 240;
 constexpr int buttonHeight = 120;
 constexpr Vector2 normalButtonPos = {300.0f, 240.0f};
@@ -26,12 +27,29 @@ constexpr Vector2 initialBossPos = {1000.0f, 240.0f};
 constexpr int initialPlayerHP = 3;
 constexpr int initialBossHP = 10;
 
+
 struct Bullet
 {
     Vector2 bulletPos;
     Vector2 bulletDirection;
     int bulletSize;
     bool bulletActive;
+};
+struct Player
+{
+    Vector2 playerPos;
+    int playerHP;
+    Rectangle playerRec;
+    Bullet playerBullets[maxBullets];
+};
+
+struct Boss
+{
+    Vector2 bossPos;
+    int bossHP;
+    Rectangle bossRec;
+    float shootTimer;
+    Bullet bossBullets[maxBullets];
 };
 
 enum class GameState
@@ -49,9 +67,9 @@ enum class GameMode
 };
 
 // Function prototype
-void ResetGame(Vector2 &playerPos, int &playerHP, Rectangle &playerRec, int &bossHP, Bullet (&playerBullets)[maxBullets], Bullet (&bossBullets)[maxBullets], float &bossShootTimer, GameMode gameMode);
+void ResetGame(Player &player, Boss &boss, GameMode gameMode);
 float ClampValue(float value, float min, float max);
-void UpdatePlayer(Vector2 &playerPos, float deltaTime);
+void UpdatePlayer(Player &player, float deltaTime);
 void InitializePlayerBullets(Bullet (&bullets)[maxBullets]);
 void InitializeBossBullets(Bullet (&bullets)[maxBullets], GameMode gameMode);
 void ShootPlayerBullets(Bullet (&bullets)[maxBullets], const Vector2 &playerPos);
@@ -59,16 +77,18 @@ void UpdatePlayerBullets(Bullet (&bullets)[maxBullets], float deltaTime, int &bo
 void DrawBullets(const Bullet (&bullets)[maxBullets], Color color);
 void ShootBossBullets(Bullet (&bullets)[maxBullets], const Vector2 &playerPos, const Vector2 &bossPos, float deltaTime, float &shootTimer, GameMode gameMode);
 void UpdateBossBullets(Bullet (&bullets)[maxBullets], float deltaTime, int &playerHP, const Rectangle &playerRec, bool collisionEnabled);
+void InitializePlayer(Player &player);
+void InitializeBoss(Boss &boss, GameMode gameMode);
 
-void ResetGame(Vector2 &playerPos, int &playerHP, Rectangle &playerRec, int &bossHP, Bullet (&playerBullets)[maxBullets], Bullet (&bossBullets)[maxBullets], float &bossShootTimer, GameMode gameMode)
+void ResetGame(Player &player, Boss &boss, GameMode gameMode)
 {
-    playerPos = initialPlayerPos;
-    playerHP = initialPlayerHP;
-    playerRec = {playerPos.x, playerPos.y, playerSize, playerSize};
-    bossHP = initialBossHP;
-    InitializePlayerBullets(playerBullets);
-    InitializeBossBullets(bossBullets, gameMode);
-    bossShootTimer = 0.0f;
+    player.playerPos = initialPlayerPos;
+    player.playerHP = initialPlayerHP;
+    player.playerRec = {player.playerPos.x, player.playerPos.y, playerSize, playerSize};
+    boss.bossHP = initialBossHP;
+    InitializePlayerBullets(player.playerBullets);
+    InitializeBossBullets(boss.bossBullets, gameMode);
+    boss.shootTimer = 0.0f;
 }
 
 float ClampValue(float value, float min, float max)
@@ -80,7 +100,7 @@ float ClampValue(float value, float min, float max)
     return value;
 }
 
-void UpdatePlayer(Vector2 &playerPos, float deltaTime)
+void UpdatePlayer(Player &player, float deltaTime)
 {
     float currentPlayerSpeed = normalPlayerSpeed;
     Vector2 moveDirection = {0.0f, 0.0f};
@@ -121,12 +141,15 @@ void UpdatePlayer(Vector2 &playerPos, float deltaTime)
     }
 
     // Move player
-    playerPos.x += currentPlayerSpeed * moveDirection.x * deltaTime;
-    playerPos.y += currentPlayerSpeed * moveDirection.y * deltaTime;
+    player.playerPos.x += currentPlayerSpeed * moveDirection.x * deltaTime;
+    player.playerPos.y += currentPlayerSpeed * moveDirection.y * deltaTime;
 
     // Clamp player position to screen bounds
-    playerPos.x = ClampValue(playerPos.x, 0.0f, (float)(screenWidth - playerSize));
-    playerPos.y = ClampValue(playerPos.y, 0.0f, (float)(screenHeight - playerSize));
+    player.playerPos.x = ClampValue(player.playerPos.x, 0.0f, (float)(screenWidth - playerSize));
+    player.playerPos.y = ClampValue(player.playerPos.y, 0.0f, (float)(screenHeight - playerSize));
+
+    player.playerRec.x = player.playerPos.x;
+    player.playerRec.y = player.playerPos.y;
 }
 
 void InitializePlayerBullets(Bullet (&bullets)[maxBullets])
@@ -240,6 +263,15 @@ void ShootBossBullets(Bullet (&bullets)[maxBullets], const Vector2 &playerPos, c
 
     // ShootBullets
     shootTimer += deltaTime;
+    float bossShootInterval = normalBossShootInterval;
+    if(gameMode == GameMode::Normal)
+    {
+        bossShootInterval = normalBossShootInterval;
+    }
+    else if(gameMode == GameMode::Hard)
+    {
+        bossShootInterval = hardBossShootInterval;
+    }
 
     if (shootTimer < bossShootInterval)
         return;
@@ -275,7 +307,7 @@ void UpdateBossBullets(Bullet (&bullets)[maxBullets], float deltaTime, int &play
                 bullet.bulletPos = {0.0f, 0.0f};
             }
 
-            if (bullet.bulletPos.x < 0.0f)
+            if (bullet.bulletPos.x < 0.0f || bullet.bulletPos.x > screenWidth || bullet.bulletPos.y < 0.0f || bullet.bulletPos.y > screenHeight)
             {
                 bullet.bulletActive = false;
                 bullet.bulletPos = {0.0f, 0.0f};
@@ -283,6 +315,24 @@ void UpdateBossBullets(Bullet (&bullets)[maxBullets], float deltaTime, int &play
         }
     }
 }
+
+void InitializePlayer(Player& player)
+{
+    player.playerPos = initialPlayerPos;
+    player.playerHP = initialPlayerHP;
+    player.playerRec = {player.playerPos.x, player.playerPos.y, playerSize, playerSize};
+    InitializePlayerBullets(player.playerBullets);
+}
+
+void InitializeBoss(Boss& boss, GameMode gameMode)
+{
+    boss.bossPos = initialBossPos;
+    boss.bossHP = initialBossHP;
+    boss.bossRec = {boss.bossPos.x, boss.bossPos.y, bossWidth, bossHeight};
+    boss.shootTimer = 0.0f;
+    InitializeBossBullets(boss.bossBullets, gameMode);
+}
+
 
 int main()
 {
@@ -293,17 +343,11 @@ int main()
 
     Rectangle normalButtonRec = {normalButtonPos.x, normalButtonPos.y, buttonWidth, buttonHeight};
     Rectangle hardButtonRec = {hardButtonPos.x, hardButtonPos.y, buttonWidth, buttonHeight};
-    Vector2 playerPos = initialPlayerPos;
-    int playerHP = initialPlayerHP;
-    Rectangle playerRec = {playerPos.x, playerPos.y, playerSize, playerSize};
-    Vector2 bossPos = initialBossPos;
-    int bossHP = initialBossHP;
-    Rectangle bossRec = {bossPos.x, bossPos.y, bossWidth, bossHeight};
-    Bullet playerBullets[maxBullets];
-    Bullet bossBullets[maxBullets];
-    InitializePlayerBullets(playerBullets);
-    InitializeBossBullets(bossBullets, gameMode);
-    float bossShootTimer = 0.0f;
+    
+    Player player;
+    Boss boss;
+    InitializePlayer(player);
+    InitializeBoss(boss, gameMode);
 
     while (!WindowShouldClose())
     {
@@ -313,61 +357,55 @@ int main()
         switch (gameState)
         {
         case GameState::ModeSelect:
-            UpdatePlayer(playerPos, deltaTime);
-            playerRec.x = playerPos.x;
-            playerRec.y = playerPos.y;
-            if (CheckCollisionRecs(playerRec, normalButtonRec) && IsKeyPressed(KEY_ENTER))
+            UpdatePlayer(player, deltaTime);
+            if (CheckCollisionRecs(player.playerRec, normalButtonRec) && IsKeyPressed(KEY_ENTER))
             {
                 gameState = GameState::Playing;
                 gameMode = GameMode::Normal;
-                ResetGame(playerPos, playerHP, playerRec, bossHP, playerBullets, bossBullets, bossShootTimer, gameMode);
+                ResetGame(player, boss, gameMode);
             }
-            else if (CheckCollisionRecs(playerRec, hardButtonRec) && IsKeyPressed(KEY_ENTER))
+            else if (CheckCollisionRecs(player.playerRec, hardButtonRec) && IsKeyPressed(KEY_ENTER))
             {
                 gameState = GameState::Playing;
                 gameMode = GameMode::Hard;
-                ResetGame(playerPos, playerHP, playerRec, bossHP, playerBullets, bossBullets, bossShootTimer, gameMode);
+                ResetGame(player, boss, gameMode);
             }
             break;
         case GameState::Playing:
-            UpdatePlayer(playerPos, deltaTime);
-            playerRec.x = playerPos.x;
-            playerRec.y = playerPos.y;
-            ShootPlayerBullets(playerBullets, playerPos);
-            ShootBossBullets(bossBullets, playerPos, bossPos, deltaTime, bossShootTimer, gameMode);
-            UpdatePlayerBullets(playerBullets, deltaTime, bossHP, bossRec, true);
-            UpdateBossBullets(bossBullets, deltaTime, playerHP, playerRec, true);
+            UpdatePlayer(player, deltaTime);
+            ShootPlayerBullets(player.playerBullets, player.playerPos);
+            ShootBossBullets(boss.bossBullets, player.playerPos, boss.bossPos, deltaTime, boss.shootTimer, gameMode);
+            UpdatePlayerBullets(player.playerBullets, deltaTime, boss.bossHP, boss.bossRec, true);
+            UpdateBossBullets(boss.bossBullets, deltaTime, player.playerHP, player.playerRec, true);
             // Check win/lose conditions
-            if (playerHP <= 0)
+            if (player.playerHP <= 0)
             {
                 gameState = GameState::GameOver;
             }
-            else if (bossHP <= 0)
+            else if (boss.bossHP <= 0)
             {
                 gameState = GameState::Victory;
             }
             break;
         case GameState::Victory:
-            UpdatePlayer(playerPos, deltaTime);
-            playerRec.x = playerPos.x;
-            playerRec.y = playerPos.y;
-            ShootPlayerBullets(playerBullets, playerPos);
-            UpdatePlayerBullets(playerBullets, deltaTime, bossHP, bossRec, false);
-            UpdateBossBullets(bossBullets, deltaTime, playerHP, playerRec, false);
+            UpdatePlayer(player, deltaTime);
+            ShootPlayerBullets(player.playerBullets, player.playerPos);
+            UpdatePlayerBullets(player.playerBullets, deltaTime, boss.bossHP, boss.bossRec, false);
+            UpdateBossBullets(boss.bossBullets, deltaTime, player.playerHP, player.playerRec, false);
             if (IsKeyPressed(KEY_R))
             {
                 gameState = GameState::ModeSelect;
-                ResetGame(playerPos, playerHP, playerRec, bossHP, playerBullets, bossBullets, bossShootTimer, gameMode);
+                ResetGame(player, boss, gameMode);
             }
             break;
         case GameState::GameOver:
             if (IsKeyPressed(KEY_R))
             {
                 gameState = GameState::ModeSelect;
-                ResetGame(playerPos, playerHP, playerRec, bossHP, playerBullets, bossBullets, bossShootTimer, gameMode);
+                ResetGame(player, boss, gameMode);
             }
-            UpdatePlayerBullets(playerBullets, deltaTime, bossHP, bossRec, false);
-            UpdateBossBullets(bossBullets, deltaTime, playerHP, playerRec, false);
+            UpdatePlayerBullets(player.playerBullets, deltaTime, boss.bossHP, boss.bossRec, false);
+            UpdateBossBullets(boss.bossBullets, deltaTime, player.playerHP, player.playerRec, false);
             break;
         }
 
@@ -385,30 +423,30 @@ int main()
             DrawText("normal", normalButtonPos.x + (buttonWidth / 2.0), normalButtonPos.y + (buttonHeight / 2.0), 32, BLACK);
             DrawRectangleRec(hardButtonRec, RED);
             DrawText("hard", hardButtonPos.x + (buttonWidth / 2.0), hardButtonPos.y + (buttonHeight / 2.0), 32, BLACK);
-            DrawRectangle((int)playerPos.x, (int)playerPos.y, playerSize, playerSize, SKYBLUE);
+            DrawRectangleRec(player.playerRec, SKYBLUE);
             break;
         case GameState::Playing:
-            DrawText(TextFormat("Player HP: %d", playerHP), 20, 80, 20, BLACK);
-            DrawRectangle((int)playerPos.x, (int)playerPos.y, playerSize, playerSize, SKYBLUE);
-            DrawText(TextFormat("Boss HP: %d", bossHP), 1000, 200, 20, BLACK);
-            DrawRectangleRec(bossRec, RED);
+            DrawText(TextFormat("Player HP: %d", player.playerHP), 20, 80, 20, BLACK);
+            DrawRectangleRec(player.playerRec, SKYBLUE);
+            DrawText(TextFormat("Boss HP: %d", boss.bossHP), 1000, 200, 20, BLACK);
+            DrawRectangleRec(boss.bossRec, RED);
             break;
         case GameState::Victory:
             DrawText("Press R key to select mode !", 300, 100, 36, BLACK);
-            DrawText(TextFormat("Player HP: %d", playerHP), 20, 80, 20, BLACK);
-            DrawRectangleRec(playerRec, SKYBLUE);
+            DrawText(TextFormat("Player HP: %d", player.playerHP), 20, 80, 20, BLACK);
+            DrawRectangleRec(player.playerRec, SKYBLUE);
             DrawText("Boss defeated!", 1000, 200, 20, BLACK);
             break;
         case GameState::GameOver:
             DrawText("Press R key to select mode !", 300, 100, 36, BLACK);
-            DrawText(TextFormat("Boss HP: %d", bossHP), 1000, 200, 20, BLACK);
-            DrawRectangleRec(bossRec, RED);
+            DrawText(TextFormat("Boss HP: %d", boss.bossHP), 1000, 200, 20, BLACK);
+            DrawRectangleRec(boss.bossRec, RED);
             DrawText("You Lose...", 20, 80, 20, BLACK);
             break;
         }
         // Draw common objects
-        DrawBullets(playerBullets, BLACK);
-        DrawBullets(bossBullets, RED);
+        DrawBullets(player.playerBullets, BLACK);
+        DrawBullets(boss.bossBullets, RED);
         DrawText("Boss Battle", 20, 20, 24, BLACK);
         DrawFPS(20, 55);
 
