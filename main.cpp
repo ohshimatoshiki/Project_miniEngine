@@ -22,11 +22,15 @@ constexpr int buttonWidth = 240;
 constexpr int buttonHeight = 120;
 constexpr Vector2 normalButtonPos = {300.0f, 240.0f};
 constexpr Vector2 hardButtonPos = {740.0f, 240.0f};
+constexpr Vector2 shopButtonPos = {740.0f, 480.0f};
+constexpr Vector2 hpUpButtonPos = {300.0f, 240.0f};
+constexpr Vector2 attackUpButtonPos = {740.0f, 240.0f};
 
 // Initial value
 constexpr Vector2 initialPlayerPos = {200.0f, 500.0f};
 constexpr Vector2 initialBossPos = {1000.0f, 240.0f};
-constexpr int initialPlayerHP = 3;
+constexpr int initialMaxPlayerHP = 3;
+constexpr int initialAttackPower = 1;
 constexpr int initialBossHP = 10;
 
 struct Bullet
@@ -41,6 +45,9 @@ struct Player
 {
     Vector2 playerPos;
     int playerHP;
+    int maxHP;
+    int attackPower;
+    int money;
     Rectangle playerRec;
     Bullet playerBullets[maxBullets];
 };
@@ -57,6 +64,7 @@ struct Boss
 enum class GameState
 {
     ModeSelect,
+    Shop,
     Playing,
     Victory,
     GameOver
@@ -81,13 +89,15 @@ void ShootBossBullets(const Player &player, Boss &boss, float deltaTime, GameMod
 void UpdateBossBullets(Player &player, Boss &boss, float deltaTime, bool collisionEnabled, GameMode gameMode);
 void InitializePlayer(Player &player);
 void InitializeBoss(Boss &boss, GameMode gameMode);
+void ResetPlayer(Player &player);
+void ResetBoss(Boss &boss, GameMode gameMode);
 Vector2 NormalizeVector(Vector2 vector);
 
 
 void ResetGame(Player &player, Boss &boss, GameMode gameMode)
 {
-    InitializePlayer(player);
-    InitializeBoss(boss, gameMode);
+    ResetPlayer(player);
+    ResetBoss(boss, gameMode);
 }
 
 float ClampValue(float value, float bound1, float bound2)
@@ -218,7 +228,7 @@ void UpdatePlayerBullets(Player &player, Boss &boss, float deltaTime, bool colli
             bullet.bulletPos.x += playerBulletSpeed * deltaTime;
             if (collisionEnabled && boss.bossHP > 0 && CheckCollisionCircleRec(bullet.bulletPos, bullet.bulletSize, boss.bossRec))
             {
-                boss.bossHP--;
+                boss.bossHP -= player.attackPower;
 
                 bullet.bulletActive = false;
                 bullet.bulletPos = {0.0f, 0.0f};
@@ -353,12 +363,32 @@ void UpdateBossBullets(Player &player, Boss &boss, float deltaTime, bool collisi
 void InitializePlayer(Player &player)
 {
     player.playerPos = initialPlayerPos;
-    player.playerHP = initialPlayerHP;
+    player.maxHP = initialMaxPlayerHP;
+    player.playerHP = player.maxHP;
+    player.attackPower = initialAttackPower;
+    player.money = 0;
     player.playerRec = {player.playerPos.x, player.playerPos.y, playerSize, playerSize};
     InitializePlayerBullets(player.playerBullets);
 }
 
 void InitializeBoss(Boss &boss, GameMode gameMode)
+{
+    boss.bossPos = initialBossPos;
+    boss.bossHP = initialBossHP;
+    boss.bossRec = {boss.bossPos.x, boss.bossPos.y, bossWidth, bossHeight};
+    boss.shootTimer = 0.0f;
+    InitializeBossBullets(boss.bossBullets, gameMode);
+}
+
+void ResetPlayer(Player &player)
+{
+    player.playerPos = initialPlayerPos;
+    player.playerHP = player.maxHP;
+    player.playerRec = {player.playerPos.x, player.playerPos.y, playerSize, playerSize};
+    InitializePlayerBullets(player.playerBullets);
+}
+
+void ResetBoss(Boss &boss, GameMode gameMode)
 {
     boss.bossPos = initialBossPos;
     boss.bossHP = initialBossHP;
@@ -374,6 +404,22 @@ Vector2 NormalizeVector(Vector2 vector)
     return vector;
 }
 
+void UpgradeHP(Player &player)
+{
+    if(player.money < 100) return;
+
+    player.money -= 100;
+    player.maxHP += 1;
+}
+
+void UpgradeAttack(Player &player)
+{
+    if(player.money < 100) return;
+
+    player.money -= 100;
+    player.attackPower += 1;
+}
+
 
 int main()
 {
@@ -384,6 +430,9 @@ int main()
 
     Rectangle normalButtonRec = {normalButtonPos.x, normalButtonPos.y, buttonWidth, buttonHeight};
     Rectangle hardButtonRec = {hardButtonPos.x, hardButtonPos.y, buttonWidth, buttonHeight};
+    Rectangle shopButtonRec = {shopButtonPos.x, shopButtonPos.y, buttonWidth, buttonHeight};
+    Rectangle hpUpButtonRec = {hpUpButtonPos.x, hpUpButtonPos.y, buttonWidth, buttonHeight};
+    Rectangle attackUpButtonRec = {attackUpButtonPos.x, attackUpButtonPos.y, buttonWidth, buttonHeight};
 
     Player player;
     Boss boss;
@@ -413,6 +462,31 @@ int main()
                 gameMode = GameMode::Hard;
                 ResetGame(player, boss, gameMode);
             }
+            else if (CheckCollisionRecs(player.playerRec, shopButtonRec) && IsKeyPressed(KEY_ENTER))
+            {
+                gameState = GameState::Shop;
+                ResetGame(player, boss, gameMode);
+            }
+            break;
+        case GameState::Shop:
+            UpdatePlayer(player, deltaTime);
+            ShootPlayerBullets(player);
+            UpdatePlayerBullets(player, boss, deltaTime, false);
+            if (CheckCollisionRecs(player.playerRec, hpUpButtonRec) && IsKeyPressed(KEY_ENTER))
+            {
+                UpgradeHP(player);
+                ResetGame(player, boss, gameMode);
+            }
+            else if (CheckCollisionRecs(player.playerRec, attackUpButtonRec) && IsKeyPressed(KEY_ENTER))
+            {
+                UpgradeAttack(player);
+                ResetGame(player, boss, gameMode);
+            }
+            else if (CheckCollisionRecs(player.playerRec, shopButtonRec) && IsKeyPressed(KEY_ENTER))
+            {
+                gameState = GameState::ModeSelect;
+                ResetGame(player, boss, gameMode);
+            }
             break;
         case GameState::Playing:
             UpdatePlayer(player, deltaTime);
@@ -428,6 +502,7 @@ int main()
             else if (boss.bossHP <= 0)
             {
                 gameState = GameState::Victory;
+                player.money += 100;
             }
             break;
         case GameState::Victory:
@@ -463,9 +538,21 @@ int main()
         case GameState::ModeSelect:
             DrawText("Select mode and press ENTER !", 300, 100, 36, BLACK);
             DrawRectangleRec(normalButtonRec, GREEN);
-            DrawText("normal", normalButtonPos.x + (buttonWidth / 2.0), normalButtonPos.y + (buttonHeight / 2.0), 32, BLACK);
+            DrawText("NORMAL", normalButtonPos.x + (buttonWidth / 4.0), normalButtonPos.y + (buttonHeight / 2.0), 32, BLACK);
             DrawRectangleRec(hardButtonRec, RED);
-            DrawText("hard", hardButtonPos.x + (buttonWidth / 2.0), hardButtonPos.y + (buttonHeight / 2.0), 32, BLACK);
+            DrawText("HARD", hardButtonPos.x + (buttonWidth / 4.0), hardButtonPos.y + (buttonHeight / 2.0), 32, BLACK);
+            DrawRectangleRec(shopButtonRec, BLUE);
+            DrawText("SHOP", shopButtonPos.x + (buttonWidth / 4.0), shopButtonPos.y + (buttonHeight / 2.0), 32, BLACK);
+            DrawRectangleRec(player.playerRec, SKYBLUE);
+            break;
+        case GameState::Shop:
+            DrawText("Select mode and press ENTER !", 300, 100, 36, BLACK);
+            DrawRectangleRec(hpUpButtonRec, GREEN);
+            DrawText("HP UP", hpUpButtonPos.x + (buttonWidth / 4.0), hpUpButtonPos.y + (buttonHeight / 2.0), 32, BLACK);
+            DrawRectangleRec(attackUpButtonRec, RED);
+            DrawText("ATK UP", attackUpButtonPos.x + (buttonWidth / 4.0), attackUpButtonPos.y + (buttonHeight / 2.0), 32, BLACK);
+            DrawRectangleRec(shopButtonRec, BLUE);
+            DrawText("BACK", shopButtonPos.x + (buttonWidth / 4.0), shopButtonPos.y + (buttonHeight / 2.0), 32, BLACK);
             DrawRectangleRec(player.playerRec, SKYBLUE);
             break;
         case GameState::Playing:
@@ -491,6 +578,8 @@ int main()
         DrawBullets(player.playerBullets, BLACK);
         DrawBullets(boss.bossBullets, RED);
         DrawText("Boss Battle", 20, 20, 24, BLACK);
+        DrawText(TextFormat("Player money: %d", player.money), 1000, 20, 20, BLACK);
+        DrawText(TextFormat("Player attack power: %d", player.attackPower), 1000, 55, 20, BLACK);
         DrawFPS(20, 55);
 
         EndDrawing();
