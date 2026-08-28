@@ -70,7 +70,7 @@ enum class GameMode
 
 // Function prototype
 void ResetGame(Player &player, Boss &boss, GameMode gameMode);
-float ClampValue(float value, float dt1, float dt2);
+float ClampValue(float value, float bound1, float bound2);
 void UpdatePlayer(Player &player, float deltaTime);
 void InitializePlayerBullets(Bullet (&bullets)[maxBullets]);
 void InitializeBossBullets(Bullet (&bullets)[maxBullets], GameMode gameMode);
@@ -81,6 +81,8 @@ void ShootBossBullets(const Player &player, Boss &boss, float deltaTime, GameMod
 void UpdateBossBullets(Player &player, Boss &boss, float deltaTime, bool collisionEnabled, GameMode gameMode);
 void InitializePlayer(Player &player);
 void InitializeBoss(Boss &boss, GameMode gameMode);
+Vector2 NormalizeVector(Vector2 vector);
+
 
 void ResetGame(Player &player, Boss &boss, GameMode gameMode)
 {
@@ -88,18 +90,18 @@ void ResetGame(Player &player, Boss &boss, GameMode gameMode)
     InitializeBoss(boss, gameMode);
 }
 
-float ClampValue(float value, float dt1, float dt2)
+float ClampValue(float value, float bound1, float bound2)
 {
     float min, max;
-    if(dt1 < dt2)
+    if(bound1 < bound2)
     {
-        min = dt1;
-        max = dt2;
+        min = bound1;
+        max = bound2;
     }
     else
     {
-        min = dt2;
-        max = dt1;
+        min = bound2;
+        max = bound1;
     }
     if (value < min)
         value = min;
@@ -140,13 +142,7 @@ void UpdatePlayer(Player &player, float deltaTime)
     }
 
     // Normalization
-    float length = sqrtf((moveDirection.x * moveDirection.x) + (moveDirection.y * moveDirection.y));
-
-    if (length > 0.0f)
-    {
-        moveDirection.x = moveDirection.x / length;
-        moveDirection.y = moveDirection.y / length;
-    }
+    moveDirection = NormalizeVector(moveDirection);
 
     // Move player
     player.playerPos.x += currentPlayerSpeed * moveDirection.x * deltaTime;
@@ -250,30 +246,9 @@ void DrawBullets(const Bullet (&bullets)[maxBullets], Color color)
 
 void ShootBossBullets(const Player &player, Boss &boss, float deltaTime, GameMode gameMode)
 {
-    Vector2 direction;
-
-    if (gameMode == GameMode::Normal)
-    {
-        direction = {-1.0f, 0.0f};
-    }
-    else
-    {
-        Vector2 bulletStartPos = {boss.bossPos.x, boss.bossPos.y + (bossHeight / 2.0f)};
-        Vector2 playerCenter = {player.playerPos.x + (playerSize / 2.0f), player.playerPos.y + (playerSize / 2.0f)};
-        direction = {playerCenter.x - bulletStartPos.x, playerCenter.y - bulletStartPos.y};
-
-        // normalization
-        float length = sqrt(direction.x * direction.x + direction.y * direction.y);
-        if (length > 0.0f)
-        {
-            direction.x = direction.x / length;
-            direction.y = direction.y / length;
-        }
-    }
-
-    // ShootBullets
     boss.shootTimer += deltaTime;
     float bossShootInterval = normalBossShootInterval;
+
     if (gameMode == GameMode::Normal)
     {
         bossShootInterval = normalBossShootInterval;
@@ -287,6 +262,24 @@ void ShootBossBullets(const Player &player, Boss &boss, float deltaTime, GameMod
         return;
 
     boss.shootTimer = 0.0f;
+
+    Vector2 direction;
+
+    if (gameMode == GameMode::Normal)
+    {
+        direction = {-1.0f, 0.0f};
+    }
+    else
+    {
+        Vector2 bulletStartPos = {boss.bossPos.x, boss.bossPos.y + (bossHeight / 2.0f)};
+        Vector2 playerCenter = {player.playerPos.x + (playerSize / 2.0f), player.playerPos.y + (playerSize / 2.0f)};
+        direction = {playerCenter.x - bulletStartPos.x, playerCenter.y - bulletStartPos.y};
+
+        // normalization
+        direction = NormalizeVector(direction);
+    }
+
+    // ShootBullets    
     for (Bullet &bullet : boss.bossBullets)
     {
         if (bullet.bulletActive)
@@ -316,13 +309,8 @@ void UpdateBossBullets(Player &player, Boss &boss, float deltaTime, bool collisi
                     Vector2 playerCenter = {player.playerPos.x + (playerSize / 2.0f), player.playerPos.y + (playerSize / 2.0f)};
                     Vector2 targetDirection = {playerCenter.x - bullet.bulletPos.x, playerCenter.y - bullet.bulletPos.y};
 
-                    // normalization
-                    float length = sqrt(targetDirection.x * targetDirection.x + targetDirection.y * targetDirection.y);
-                    if (length > 0.0f)
-                    {
-                        targetDirection.x = targetDirection.x / length;
-                        targetDirection.y = targetDirection.y / length;
-                    }
+                    
+                    targetDirection = NormalizeVector(targetDirection);
                     
                     //Limit the rotation angle
                     float currentAngle = atan2f(bullet.bulletDirection.y, bullet.bulletDirection.x);
@@ -378,6 +366,14 @@ void InitializeBoss(Boss &boss, GameMode gameMode)
     boss.shootTimer = 0.0f;
     InitializeBossBullets(boss.bossBullets, gameMode);
 }
+
+Vector2 NormalizeVector(Vector2 vector)
+{
+    float length = sqrt(vector.x * vector.x + vector.y * vector.y);
+    if(length > 0.0f) vector = {vector.x / length, vector.y / length};
+    return vector;
+}
+
 
 int main()
 {
