@@ -20,6 +20,8 @@ constexpr float homingTime = 1.5f;
 constexpr float homingTurnSpeed = PI / 2.0f;
 constexpr int buttonWidth = 240;
 constexpr int buttonHeight = 120;
+constexpr int normalMoney = 50;
+constexpr int hardMoney = 100;
 constexpr Vector2 normalButtonPos = {300.0f, 240.0f};
 constexpr Vector2 hardButtonPos = {740.0f, 240.0f};
 constexpr Vector2 shopButtonPos = {740.0f, 480.0f};
@@ -92,6 +94,9 @@ void InitializeBoss(Boss &boss, GameMode gameMode);
 void ResetPlayer(Player &player);
 void ResetBoss(Boss &boss, GameMode gameMode);
 Vector2 NormalizeVector(Vector2 vector);
+void UpgradeHP(Player &player);
+void UpgradeAttack(Player &player);
+void AddMoney(Player &player, GameMode gameMode);
 
 
 void ResetGame(Player &player, Boss &boss, GameMode gameMode)
@@ -420,6 +425,18 @@ void UpgradeAttack(Player &player)
     player.attackPower += 1;
 }
 
+void AddMoney(Player &player, GameMode gameMode)
+{
+    if(gameMode == GameMode::Normal)
+    {
+        player.money += normalMoney;
+    }
+    else if(gameMode == GameMode::Hard)
+    {
+        player.money += hardMoney;
+    }
+}
+
 
 int main()
 {
@@ -502,7 +519,7 @@ int main()
             else if (boss.bossHP <= 0)
             {
                 gameState = GameState::Victory;
-                player.money += 100;
+                AddMoney(player, gameMode);
             }
             break;
         case GameState::Victory:
@@ -526,6 +543,7 @@ int main()
             UpdateBossBullets(player, boss, deltaTime, false, gameMode);
             break;
         }
+
 
         // Drawing
         BeginDrawing();
