@@ -419,17 +419,21 @@ Vector2 NormalizeVector(Vector2 vector)
 
 void UpgradeHP(Player &player)
 {
-    if(player.money < 100) return;
+    int cost  = 50 + (player.maxHP - 2) * 50;
 
-    player.money -= 100;
+    if(player.money < cost) return;
+
+    player.money -= cost;
     player.maxHP += 1;
 }
 
 void UpgradeAttack(Player &player)
 {
-    if(player.money < 100) return;
+    int cost  = 50 + player.attackPower * 50;
 
-    player.money -= 100;
+    if(player.money < cost) return;
+
+    player.money -= cost;
     player.attackPower += 1;
 }
 
@@ -437,7 +441,7 @@ void AddMoney(Player &player, Boss &boss, GameMode gameMode)
 {
     if(gameMode == GameMode::Normal)
     {
-        player.money += normalMoney * boss.bossLevel;
+        player.money += normalMoney;
     }
     else if(gameMode == GameMode::Hard)
     {
@@ -452,7 +456,7 @@ void bossLevelUp(Player &player, Boss &boss)
 
     //上げ幅は要調整
     boss.bossLevel += 1;
-    boss.maxBossHP += boss.bossLevel;
+    boss.maxBossHP += boss.bossLevel * 2;
     boss.bossAtk = (1 + boss.bossLevel) / 2;
     //お金減らす
     player.money -= cost;
