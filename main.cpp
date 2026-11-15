@@ -1,5 +1,7 @@
 #include "raylib.h"
 #include <cmath>
+#include <iostream>
+#include <random>
 
 constexpr int screenWidth = 1280;
 constexpr int screenHeight = 720;
@@ -7,8 +9,6 @@ constexpr int playerSize = 50;
 constexpr int playerBulletSize = 5;
 constexpr int normalBulletSize = 5;
 constexpr int hardBulletSize = 10;
-constexpr int bossWidth = 100;
-constexpr int bossHeight = 180;
 constexpr float normalPlayerSpeed = 300.0f;
 constexpr float dashPlayerSpeed = 450.0f;
 constexpr int maxBullets = 3;
@@ -16,6 +16,7 @@ constexpr float playerBulletSpeed = 1000.0f;
 constexpr float bossBulletSpeed = 400.0f;
 constexpr float normalBossShootInterval = 1.0f;
 constexpr float hardBossShootInterval = 0.5f;
+constexpr float bossChangeDirTimer = 1.0f;
 constexpr float homingTime = 1.5f;
 constexpr float homingTurnSpeed = PI / 2.0f;
 constexpr int buttonWidth = 240;
@@ -35,6 +36,9 @@ constexpr Vector2 initialBossPos = {1000.0f, 240.0f};
 constexpr int initialMaxPlayerHP = 3;
 constexpr int initialAttackPower = 1;
 constexpr int initialBossHP = 10;
+constexpr float initialBossSpeed = 100.0f;
+constexpr int initialBossWidth = 100;
+constexpr int initialBossHeight = 180;
 
 struct Bullet
 {
@@ -58,10 +62,15 @@ struct Player
 struct Boss
 {
     Vector2 bossPos;
+    float bossCurrentSpeed;
+    Vector2 bossMoveDirection;
+    float changeDirTimer;
     int bossHP;
     int maxBossHP;
     int bossAtk;
     int bossLevel;
+    float bossWidth;
+    float bossHeight;
     Rectangle bossRec;
     float shootTimer;
     Bullet bossBullets[maxBullets];
@@ -82,10 +91,17 @@ enum class GameMode
     Hard
 };
 
+// To use random number
+std::random_device seed_gen;
+std::uint32_t seed = seed_gen();
+std::mt19937 engine(seed);
+
+
 // Function prototype
 void ResetGame(Player &player, Boss &boss, GameMode gameMode);
 float ClampValue(float value, float bound1, float bound2);
 void UpdatePlayer(Player &player, float deltaTime);
+void UpdateBoss(Boss &boss, float deltaTime);
 void InitializePlayerBullets(Bullet (&bullets)[maxBullets]);
 void InitializeBossBullets(Bullet (&bullets)[maxBullets], GameMode gameMode);
 void ShootPlayerBullets(Player &player);
@@ -174,6 +190,33 @@ void UpdatePlayer(Player &player, float deltaTime)
 
     player.playerRec.x = player.playerPos.x;
     player.playerRec.y = player.playerPos.y;
+}
+
+void UpdateBoss(Boss &boss, float deltaTime)
+{
+    boss.changeDirTimer += deltaTime;
+    if(boss.changeDirTimer >= bossChangeDirTimer)
+    {
+        std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+
+        boss.bossMoveDirection.y = dist(engine);
+
+        boss.changeDirTimer = 0.0f;
+    }
+
+    // Normalization
+    boss.bossMoveDirection = NormalizeVector(boss.bossMoveDirection);
+
+    // Move player
+    boss.bossPos.x += boss.bossCurrentSpeed * boss.bossMoveDirection.x * deltaTime;
+    boss.bossPos.y += boss.bossCurrentSpeed * boss.bossMoveDirection.y * deltaTime;
+
+    // Clamp player position to screen bounds
+    boss.bossPos.x = ClampValue(boss.bossPos.x, 0.0f, (float)(screenWidth - boss.bossWidth));
+    boss.bossPos.y = ClampValue(boss.bossPos.y, 0.0f, (float)(screenHeight - boss.bossHeight));
+
+    boss.bossRec.x = boss.bossPos.x;
+    boss.bossRec.y = boss.bossPos.y;
 }
 
 void InitializePlayerBullets(Bullet (&bullets)[maxBullets])
@@ -291,7 +334,7 @@ void ShootBossBullets(const Player &player, Boss &boss, float deltaTime, GameMod
     }
     else
     {
-        Vector2 bulletStartPos = {boss.bossPos.x, boss.bossPos.y + (bossHeight / 2.0f)};
+        Vector2 bulletStartPos = {boss.bossPos.x, boss.bossPos.y + (boss.bossHeight / 2.0f)};
         Vector2 playerCenter = {player.playerPos.x + (playerSize / 2.0f), player.playerPos.y + (playerSize / 2.0f)};
         direction = {playerCenter.x - bulletStartPos.x, playerCenter.y - bulletStartPos.y};
 
@@ -308,7 +351,7 @@ void ShootBossBullets(const Player &player, Boss &boss, float deltaTime, GameMod
         bullet.bulletActive = true;
         bullet.bulletDirection = direction;
         bullet.bulletPos = boss.bossPos;
-        bullet.bulletPos.y += (bossHeight / 2.0f);
+        bullet.bulletPos.y += (boss.bossHeight / 2.0f);
 
         break;
     }
@@ -383,13 +426,20 @@ void InitializePlayer(Player &player)
 
 void InitializeBoss(Boss &boss, GameMode gameMode)
 {
+    std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+
     boss.bossPos = initialBossPos;
+    boss.bossCurrentSpeed = initialBossSpeed;
+    boss.bossMoveDirection = {0.0f, dist(engine)};
     boss.maxBossHP = initialBossHP;
     boss.bossHP = boss.maxBossHP;
     boss.bossLevel = 1;
     boss.bossAtk = (1 + boss.bossLevel) / 2;
-    boss.bossRec = {boss.bossPos.x, boss.bossPos.y, bossWidth, bossHeight};
+    boss.bossWidth = initialBossWidth;
+    boss.bossHeight = initialBossHeight;
+    boss.bossRec = {boss.bossPos.x, boss.bossPos.y, boss.bossWidth, boss.bossHeight};
     boss.shootTimer = 0.0f;
+    boss.changeDirTimer = 0.0f;
     InitializeBossBullets(boss.bossBullets, gameMode);
 }
 
@@ -405,7 +455,7 @@ void ResetBoss(Boss &boss, GameMode gameMode)
 {
     boss.bossPos = initialBossPos;
     boss.bossHP = boss.maxBossHP;
-    boss.bossRec = {boss.bossPos.x, boss.bossPos.y, bossWidth, bossHeight};
+    boss.bossRec = {boss.bossPos.x, boss.bossPos.y, boss.bossWidth, boss.bossHeight};
     boss.shootTimer = 0.0f;
     InitializeBossBullets(boss.bossBullets, gameMode);
 }
@@ -538,6 +588,7 @@ int main()
             break;
         case GameState::Playing:
             UpdatePlayer(player, deltaTime);
+            UpdateBoss(boss, deltaTime);
             ShootPlayerBullets(player);
             ShootBossBullets(player, boss, deltaTime, gameMode);
             UpdatePlayerBullets(player, boss, deltaTime, true);
