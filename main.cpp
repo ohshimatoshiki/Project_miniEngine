@@ -1,6 +1,5 @@
 #include "raylib.h"
 #include <cmath>
-#include <iostream>
 #include <random>
 
 constexpr int screenWidth = 1280;
@@ -285,6 +284,8 @@ void UpdatePlayerBullets(Player &player, Boss &boss, float deltaTime, bool colli
 
                 bullet.bulletActive = false;
                 bullet.bulletPos = {0.0f, 0.0f};
+
+                TraceLog(LOG_INFO, "Boss Hit! bossHP: %d / %d", boss.bossHP, boss.maxBossHP);
             }
 
             if (bullet.bulletPos.x > screenWidth)
@@ -401,6 +402,8 @@ void UpdateBossBullets(Player &player, Boss &boss, float deltaTime, bool collisi
                 bullet.bulletActive = false;
                 bullet.bulletPos = {0.0f, 0.0f};
                 bullet.homingTimer = 0.0f;
+
+                TraceLog(LOG_INFO, "Player Hit! playerHP: %d / %d", player.playerHP, player.maxHP);
             }
 
             if (bullet.bulletPos.x < 0.0f || bullet.bulletPos.x > screenWidth || bullet.bulletPos.y < 0.0f || bullet.bulletPos.y > screenHeight)
@@ -422,6 +425,8 @@ void InitializePlayer(Player &player)
     player.money = 0;
     player.playerRec = {player.playerPos.x, player.playerPos.y, playerSize, playerSize};
     InitializePlayerBullets(player.playerBullets);
+
+    TraceLog(LOG_INFO, "Initialize Player.");
 }
 
 void InitializeBoss(Boss &boss, GameMode gameMode)
@@ -441,6 +446,8 @@ void InitializeBoss(Boss &boss, GameMode gameMode)
     boss.shootTimer = 0.0f;
     boss.changeDirTimer = 0.0f;
     InitializeBossBullets(boss.bossBullets, gameMode);
+
+    TraceLog(LOG_INFO, "Initialize Boss.");
 }
 
 void ResetPlayer(Player &player)
@@ -449,6 +456,7 @@ void ResetPlayer(Player &player)
     player.playerHP = player.maxHP;
     player.playerRec = {player.playerPos.x, player.playerPos.y, playerSize, playerSize};
     InitializePlayerBullets(player.playerBullets);
+    TraceLog(LOG_INFO, "Reset Player.");
 }
 
 void ResetBoss(Boss &boss, GameMode gameMode)
@@ -458,6 +466,7 @@ void ResetBoss(Boss &boss, GameMode gameMode)
     boss.bossRec = {boss.bossPos.x, boss.bossPos.y, boss.bossWidth, boss.bossHeight};
     boss.shootTimer = 0.0f;
     InitializeBossBullets(boss.bossBullets, gameMode);
+    TraceLog(LOG_INFO, "Reset Boss.");
 }
 
 Vector2 NormalizeVector(Vector2 vector)
@@ -475,6 +484,8 @@ void UpgradeHP(Player &player)
 
     player.money -= cost;
     player.maxHP += 1;
+
+    TraceLog(LOG_INFO, "Upgrade HP. cost: %d, newHP: %d, Remaining Balance: %d", cost, player.maxHP, player.money);
 }
 
 void UpgradeAttack(Player &player)
@@ -485,18 +496,26 @@ void UpgradeAttack(Player &player)
 
     player.money -= cost;
     player.attackPower += 1;
+
+    TraceLog(LOG_INFO, "Upgrade Attack. cost %d, newAtkPower: %d, Remaining Balance: %d", cost, player.attackPower, player.money);
 }
 
 void AddMoney(Player &player, Boss &boss, GameMode gameMode)
 {
+    int money;
+
     if(gameMode == GameMode::Normal)
     {
-        player.money += normalMoney;
+        money = normalMoney;
+        player.money += money;
     }
     else if(gameMode == GameMode::Hard)
     {
-        player.money += hardMoney * boss.bossLevel;
+        money = hardMoney * boss.bossLevel;
+        player.money += money;
     }
+
+    TraceLog(LOG_INFO, "Get money: %d, Balance: %d", money, player.money);
 }
 
 void bossLevelUp(Player &player, Boss &boss)
@@ -510,6 +529,8 @@ void bossLevelUp(Player &player, Boss &boss)
     boss.bossAtk = (1 + boss.bossLevel) / 2;
     //お金減らす
     player.money -= cost;
+
+    TraceLog(LOG_INFO, "Boss Level Up. newLv: %d, HP: %d, Atk: %d, cost: %d, Remaining Balance", boss.bossLevel, boss.maxBossHP, boss.bossAtk, cost, player.money);
 }
 
 
@@ -546,19 +567,26 @@ int main()
             if (CheckCollisionRecs(player.playerRec, normalButtonRec) && IsKeyPressed(KEY_ENTER))
             {
                 gameState = GameState::Playing;
-                gameMode = GameMode::Normal;
+                gameMode = GameMode::Normal;                
+                TraceLog(LOG_INFO, "===GameState changed. Modeselect -> Playing(Mode: %d)===", (int)gameMode);
+
                 ResetGame(player, boss, gameMode);
             }
             else if (CheckCollisionRecs(player.playerRec, hardButtonRec) && IsKeyPressed(KEY_ENTER))
             {
                 gameState = GameState::Playing;
-                gameMode = GameMode::Hard;
+                gameMode = GameMode::Hard;                
+                TraceLog(LOG_INFO, "===GameState changed. Modeselect -> Playing(Mode: %d)===", (int)gameMode);
+
                 ResetGame(player, boss, gameMode);
             }
             else if (CheckCollisionRecs(player.playerRec, shopButtonRec) && IsKeyPressed(KEY_ENTER))
             {
                 gameState = GameState::Shop;
-                ResetGame(player, boss, gameMode);
+                TraceLog(LOG_INFO, "===GameState changed. Modeselect -> Shop===");
+
+                //ResetGame(player, boss, gameMode);
+                ResetPlayer(player);
             }
             break;
         case GameState::Shop:
@@ -568,22 +596,28 @@ int main()
             if (CheckCollisionRecs(player.playerRec, hpUpButtonRec) && IsKeyPressed(KEY_ENTER))
             {
                 UpgradeHP(player);
-                ResetGame(player, boss, gameMode);
+                //ResetGame(player, boss, gameMode);
+                ResetPlayer(player);
             }
             else if (CheckCollisionRecs(player.playerRec, attackUpButtonRec) && IsKeyPressed(KEY_ENTER))
             {
                 UpgradeAttack(player);
-                ResetGame(player, boss, gameMode);
+                //ResetGame(player, boss, gameMode);
+                ResetPlayer(player);
             }
             else if (CheckCollisionRecs(player.playerRec, bossLevelUpButtonRec) && IsKeyPressed(KEY_ENTER))
             {
                 bossLevelUp(player, boss);
-                ResetGame(player, boss, gameMode);
+                //ResetGame(player, boss, gameMode);
+                ResetPlayer(player);
             }
             else if (CheckCollisionRecs(player.playerRec, shopButtonRec) && IsKeyPressed(KEY_ENTER))
             {
                 gameState = GameState::ModeSelect;
-                ResetGame(player, boss, gameMode);
+                TraceLog(LOG_INFO, "===GameState changed. Shop -> ModeSelect===");
+
+                //ResetGame(player, boss, gameMode);
+                ResetPlayer(player);
             }
             break;
         case GameState::Playing:
@@ -597,10 +631,13 @@ int main()
             if (player.playerHP <= 0)
             {
                 gameState = GameState::GameOver;
+                TraceLog(LOG_INFO, "===GameState changed. Playing -> GameOver===");
             }
             else if (boss.bossHP <= 0)
             {
                 gameState = GameState::Victory;
+                TraceLog(LOG_INFO, "===GameState changed. Playing -> Victory===");
+
                 AddMoney(player, boss, gameMode);
             }
             break;
@@ -612,6 +649,8 @@ int main()
             if (IsKeyPressed(KEY_R))
             {
                 gameState = GameState::ModeSelect;
+                TraceLog(LOG_INFO, "===GameState changed. Victory -> ModeSelect===");
+
                 ResetGame(player, boss, gameMode);
             }
             break;
@@ -619,6 +658,8 @@ int main()
             if (IsKeyPressed(KEY_R))
             {
                 gameState = GameState::ModeSelect;
+                TraceLog(LOG_INFO, "===GameState changed. GameOver -> ModeSelect===");
+
                 ResetGame(player, boss, gameMode);
             }
             UpdatePlayerBullets(player, boss, deltaTime, false);
@@ -658,30 +699,29 @@ int main()
             DrawRectangleRec(player.playerRec, SKYBLUE);
             break;
         case GameState::Playing:
-            DrawText(TextFormat("Player HP: %d", player.playerHP), 20, 80, 20, BLACK);
             DrawRectangleRec(player.playerRec, SKYBLUE);
-            DrawText(TextFormat("Boss HP: %d", boss.bossHP), 1000, 200, 20, BLACK);
             DrawRectangleRec(boss.bossRec, RED);
+            DrawText(TextFormat("Boss HP: %d", boss.bossHP), 1000, 200, 20, BLACK);
             break;
         case GameState::Victory:
             DrawText("Press R key to select mode !", 300, 100, 36, BLACK);
-            DrawText(TextFormat("Player HP: %d", player.playerHP), 20, 80, 20, BLACK);
             DrawRectangleRec(player.playerRec, SKYBLUE);
             DrawText("Boss defeated!", 1000, 200, 20, BLACK);
             break;
         case GameState::GameOver:
             DrawText("Press R key to select mode !", 300, 100, 36, BLACK);
-            DrawText(TextFormat("Boss HP: %d", boss.bossHP), 1000, 200, 20, BLACK);
             DrawRectangleRec(boss.bossRec, RED);
-            DrawText("You Lose...", 20, 80, 20, BLACK);
+            DrawText(TextFormat("Boss HP: %d", boss.bossHP), 1000, 200, 20, BLACK);
+            DrawText("You Lose...", 300, 150, 36, BLACK);
             break;
         }
         // Draw common objects
         DrawBullets(player.playerBullets, BLACK);
         DrawBullets(boss.bossBullets, RED);
         DrawText("Boss Battle", 20, 20, 24, BLACK);
-        DrawText(TextFormat("Player money: %d", player.money), 1000, 20, 20, BLACK);
-        DrawText(TextFormat("Player attack power: %d", player.attackPower), 1000, 55, 20, BLACK);
+        DrawText(TextFormat("Player money: %d", player.money), 20, 80, 20, BLACK);
+        DrawText(TextFormat("Player attack power: %d", player.attackPower), 20, 115, 20, BLACK);
+        DrawText(TextFormat("Player HP: %d", player.playerHP), 20, 150, 20, BLACK);
         DrawFPS(20, 55);
 
         EndDrawing();
