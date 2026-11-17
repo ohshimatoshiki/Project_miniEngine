@@ -480,7 +480,10 @@ void UpgradeHP(Player &player)
 {
     int cost  = 50 + (player.maxHP - 2) * 50;
 
-    if(player.money < cost) return;
+    if(player.money < cost) {
+        TraceLog(LOG_INFO, "Shortage of money. cost: %d, Remaining Balance: %d", cost, player.money);
+        return;
+    }
 
     player.money -= cost;
     player.maxHP += 1;
@@ -492,7 +495,10 @@ void UpgradeAttack(Player &player)
 {
     int cost  = 50 + player.attackPower * 50;
 
-    if(player.money < cost) return;
+    if(player.money < cost) {
+        TraceLog(LOG_INFO, "Shortage of money. cost: %d, Remaining Balance: %d", cost, player.money);
+        return;
+    }
 
     player.money -= cost;
     player.attackPower += 1;
@@ -521,7 +527,10 @@ void AddMoney(Player &player, Boss &boss, GameMode gameMode)
 void bossLevelUp(Player &player, Boss &boss)
 {
     int cost = 200 + 100 * boss.bossLevel;
-    if(player.money < cost) return;
+    if(player.money < cost) {
+        TraceLog(LOG_INFO, "Shortage of money. cost: %d, Remaining Balance: %d", cost, player.money);
+        return;
+    }
 
     //上げ幅は要調整
     boss.bossLevel += 1;
