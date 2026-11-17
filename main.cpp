@@ -527,10 +527,17 @@ void bossLevelUp(Player &player, Boss &boss)
     boss.bossLevel += 1;
     boss.maxBossHP += boss.bossLevel * 2;
     boss.bossAtk = (1 + boss.bossLevel) / 2;
+
+    //ボスの大きさ小さくする
+    boss.bossHeight *= 0.8f;
+    if(boss.bossHeight <= hardBulletSize * 2) boss.bossHeight = hardBulletSize * 2;
+    boss.bossWidth *= 0.8f;
+    if(boss.bossWidth <= hardBulletSize * 2) boss.bossWidth = hardBulletSize * 2;
+
     //お金減らす
     player.money -= cost;
 
-    TraceLog(LOG_INFO, "Boss Level Up. newLv: %d, HP: %d, Atk: %d, cost: %d, Remaining Balance", boss.bossLevel, boss.maxBossHP, boss.bossAtk, cost, player.money);
+    TraceLog(LOG_INFO, "Boss Level Up. newLv: %d, HP: %d, Atk: %d, Height: %.1f, Width: %.1f, cost: %d, Remaining Balance: %d", boss.bossLevel, boss.maxBossHP, boss.bossAtk, boss.bossHeight, boss.bossWidth, cost, player.money);
 }
 
 
